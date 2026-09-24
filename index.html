@@ -133,6 +133,8 @@
       <li>If Android asks which app should open the device, dismiss the prompt or choose Chrome.</li>
       <li>Tap <b>Connect camera</b>, pick <b>PIR206 Thermal Camera</b> and allow access.</li>
     </ol>
+    <p class="note"><b>“No compatible devices found”?</b> Tap <button id="usbScan" type="button">List all USB devices</button> to check what the phone can see.</p>
+    <div id="usbScanOut" class="note" hidden></div>
     <p class="note">Use <b>Chrome</b> on Android. You don't need to install a driver. To add the app to your home screen, open Chrome's ⋮ menu and choose <b>Add to Home screen</b> (or <b>Install app</b>).</p>
   </div>
   <div id="helpBody">
@@ -539,8 +541,9 @@ async function connect() {
     if (DEMO) cam = new DemoCamera();
     else {
       if (!navigator.usb) { showHelp('This browser has no WebUSB'); $('helpAndroid').hidden = true; $('helpBody').hidden = false; $('helpBody').innerHTML = ANDROID ? 'Open this page in <b>Chrome</b>. Other Android browsers may not support USB devices.' : 'Open this page in <b>Chrome</b> or <b>Edge</b>, or in Chrome on an Android phone. iPhone browsers have no USB access.'; throw new Error('WebUSB unavailable'); }
-      const known = (await navigator.usb.getDevices()).find(d => d.vendorId === VID && d.productId === PID);
-      const dev = known || await navigator.usb.requestDevice({ filters: [{ vendorId: VID, productId: PID }] });
+      const known = (await navigator.usb.getDevices()).find(d => d.vendorId === VID);
+      const dev = known || await navigator.usb.requestDevice({ filters: [{ vendorId: VID }] });
+      if (dev.productId !== PID) console.warn(`Seek device with product ID ${dev.productId.toString(16)}; expected 0010 (Compact)`);
       cam = new SeekCompact(dev);
       setStatus('Opening…', 'warn');
       try { await cam.open(); }
@@ -972,6 +975,26 @@ $('saveCsv').checked = store.get('saveCsv', false);
 applyControls(); showCal(); loadUserFfc(); updateDevInfo();
 
 $('connect').onclick = connect;
+$('usbScan').onclick = async () => {
+  const out = $('usbScanOut'); out.hidden = false;
+  if (!navigator.usb) { out.textContent = 'This browser has no WebUSB. Use Chrome.'; return; }
+  const h = (n) => n.toString(16).padStart(4, '0').toUpperCase();
+  const describe = (d) => {
+    const ifs = d.configuration ? d.configuration.interfaces.map(i => `#${i.interfaceNumber} class ${i.alternate.interfaceClass.toString(16)}`).join(', ') : 'not configured';
+    return `<b>${h(d.vendorId)}:${h(d.productId)}</b> ${d.manufacturerName || ''} ${d.productName || ''} (${ifs})`;
+  };
+  try {
+    const d = await navigator.usb.requestDevice({ filters: [] });
+    const isSeek = d.vendorId === VID;
+    out.innerHTML = 'Selected: ' + describe(d) + '<br>' + (isSeek
+      ? 'This is the Seek camera. Tap <b>Connect camera</b> now.'
+      : "That isn't the thermal camera (it should be <b>289D:xxxx</b>). If the camera isn't in the list at all, the phone isn't detecting it. See the checks below.");
+  } catch (e) {
+    out.innerHTML = e.name === 'NotFoundError'
+      ? "The picker was empty or cancelled. <b>If the list was empty, the phone isn't detecting the camera at USB level</b>, so check:<br>• the adapter or cable passes data, not only charge (a Lightning-to-USB-C charging adapter won't work)<br>• the camera plug is fully seated, and flip USB-C adapters over once<br>• another USB device, such as a flash drive, works on the same adapter<br>• Settings → Connected devices → USB, where OTG may need turning on each time on some phones"
+      : 'Error: ' + e.message;
+  }
+};
 $('disconnect').onclick = () => { setStatus('Disconnected'); disconnect(); };
 $('capture').onclick = capture;
 $('freeze').onclick = () => { S.frozen = !S.frozen; $('freeze').classList.toggle('on', S.frozen); $('freeze').firstChild.textContent = S.frozen ? 'Resume ' : 'Freeze '; };

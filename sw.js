@@ -1,5 +1,5 @@
 // Offline support: serve the app shell from cache, refresh it from the network when online.
-const CACHE = 'thermal-v1';
+const CACHE = 'thermal-v2';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/maskable-192.png', './icons/maskable-512.png'];
 
 self.addEventListener('install', (e) => {
