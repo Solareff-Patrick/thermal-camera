@@ -1,0 +1,1047 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f1115">
+<meta name="description" content="Live view and photos from the RS PRO / Seek Thermal Compact USB thermal camera.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<title>Thermal Camera</title>
+<style>
+  :root {
+    --bg: #0f1115; --panel: #181b22; --panel-2: #1f232c; --line: #2b303b;
+    --text: #e6e8ec; --muted: #9098a6; --accent: #ff7a1a; --accent-2: #ffb15c;
+    --ok: #3ecf8e; --warn: #f5b942; --err: #ff5a5a; --cold: #4da3ff;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, "Segoe UI", sans-serif; }
+  header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  header h1 { font-size: 17px; margin: 0; font-weight: 600; }
+  header .sub { color: var(--muted); font-size: 12px; }
+  .spacer { flex: 1; }
+  .pill { font-size: 12px; padding: 3px 10px; border-radius: 999px; background: var(--panel-2); color: var(--muted); border: 1px solid var(--line); }
+  .pill.ok { color: var(--ok); border-color: #2c5a45; }
+  .pill.warn { color: var(--warn); border-color: #5c4a22; }
+  .pill.err { color: var(--err); border-color: #5c2a2a; }
+  button, select, input { font: inherit; color: var(--text); }
+  button { background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 7px 12px; cursor: pointer; }
+  button:hover:not(:disabled) { border-color: #3d4452; background: #252a34; }
+  button:disabled { opacity: .45; cursor: default; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #1a0f05; font-weight: 600; }
+  button.primary:hover:not(:disabled) { background: var(--accent-2); border-color: var(--accent-2); }
+  button.on { border-color: var(--accent); color: var(--accent-2); }
+  select, input[type=number], input[type=text] { background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; min-width: 0; }
+  input[type=number] { width: 84px; }
+  input[type=range] { width: 100%; accent-color: var(--accent); }
+  main { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; padding: 16px; max-width: 1400px; margin: 0 auto; }
+  @media (max-width: 900px) { main { grid-template-columns: minmax(0, 1fr); } }
+  .viewer { background: #000; border: 1px solid var(--line); border-radius: 10px; padding: 10px; display: flex; gap: 10px; align-items: stretch; }
+  .canvas-wrap { position: relative; flex: 1; min-width: 0; }
+  #view { width: 100%; display: block; image-rendering: auto; cursor: crosshair; border-radius: 4px; background: #07080a; }
+  .colorbar { width: 58px; display: flex; flex-direction: column; align-items: center; font-size: 12px; font-variant-numeric: tabular-nums; }
+  .colorbar canvas { flex: 1; width: 18px; border-radius: 3px; border: 1px solid #333; min-height: 120px; }
+  .colorbar .lab { color: var(--text); padding: 3px 0; white-space: nowrap; }
+  .placeholder { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; color: var(--muted); padding: 24px; }
+  .toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; align-items: center; }
+  .readouts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 10px; }
+  @media (max-width: 560px) { .readouts { grid-template-columns: repeat(2, 1fr); } }
+  .ro { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+  .ro .k { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+  .ro .v { font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .ro.max .v { color: #ff8a65; } .ro.min .v { color: var(--cold); }
+  aside { display: flex; flex-direction: column; gap: 12px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+  .row { display: flex; align-items: center; gap: 8px; margin: 8px 0; flex-wrap: wrap; }
+  .row label { flex: 1; min-width: 110px; color: var(--muted); }
+  .pair { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .pair input[type=number] { width: 68px; }
+  .note { color: var(--muted); font-size: 12px; margin: 6px 0 0; }
+  .kv { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; font-size: 12px; }
+  .kv span:nth-child(odd) { color: var(--muted); }
+  .kv span:nth-child(even) { font-family: ui-monospace, Consolas, monospace; word-break: break-all; }
+  .help { background: #231a10; border: 1px solid #5c4322; border-radius: 10px; padding: 12px 16px; margin: 16px auto 0; max-width: 1400px; }
+  .help h3 { margin: 0 0 6px; font-size: 14px; color: var(--accent-2); }
+  .help ol { margin: 6px 0 0; padding-left: 20px; } .help li { margin: 3px 0; }
+  .help code { background: #0006; padding: 1px 5px; border-radius: 4px; }
+  .gallery-wrap { max-width: 1400px; margin: 0 auto; padding: 0 16px 24px; }
+  .gallery-head { display: flex; align-items: center; gap: 10px; margin: 4px 0 10px; flex-wrap: wrap; }
+  .gallery-head h2 { font-size: 15px; margin: 0; }
+  .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+  .shot { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .shot img { width: 100%; display: block; background: #000; cursor: zoom-in; }
+  .shot .meta { padding: 8px 10px; font-size: 12px; color: var(--muted); }
+  .shot .meta b { color: var(--text); font-weight: 600; }
+  .shot .acts { display: flex; gap: 6px; padding: 0 10px 10px; }
+  .shot .acts button { padding: 4px 8px; font-size: 12px; }
+  .empty { color: var(--muted); font-size: 13px; }
+  .flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; transition: opacity .25s; border-radius: 4px; }
+  dialog { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 10px; padding: 10px; max-width: 95vw; }
+  dialog img { max-width: 90vw; max-height: 80vh; display: block; }
+  dialog::backdrop { background: #000a; }
+  kbd { background: var(--panel-2); border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; font-size: 11px; }
+  button, select, #view { touch-action: manipulation; }
+  details.card > summary { list-style: none; cursor: pointer; font-size: 13px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .05em; display: flex; justify-content: space-between; }
+  details.card > summary::-webkit-details-marker { display: none; }
+  details.card > summary::after { content: '▾'; transition: transform .15s; }
+  details.card:not([open]) > summary::after { transform: rotate(-90deg); }
+  details.card[open] > summary { margin-bottom: 10px; }
+
+  /* Phones */
+  @media (max-width: 700px) {
+    body { font-size: 15px; padding-bottom: env(safe-area-inset-bottom); }
+    header { padding: 10px 12px; gap: 8px; }
+    header .sub, kbd, .hover-hint { display: none; }
+    header h1 { font-size: 16px; }
+    header .spacer { display: none; }
+    #connect, #disconnect { flex: 1; }
+    main { padding: 10px; gap: 10px; }
+    .viewer { padding: 6px; gap: 6px; border-radius: 8px; }
+    .colorbar { width: 44px; font-size: 11px; }
+    .colorbar canvas { width: 14px; }
+    .readouts { gap: 6px; margin-top: 6px; }
+    .ro { padding: 6px 8px; } .ro .v { font-size: 18px; }
+    .toolbar { position: sticky; bottom: 0; z-index: 5; margin: 8px -10px 0; padding: 10px 10px calc(10px + env(safe-area-inset-bottom)); background: var(--bg); border-top: 1px solid var(--line); flex-wrap: nowrap; }
+    .toolbar button { flex: 1; padding: 11px 8px; }
+    #capture { flex: 2; font-size: 16px; }
+    .help { margin: 10px; }
+    .gallery-wrap { padding: 0 10px 20px; }
+    .gallery { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .shot .acts { flex-wrap: wrap; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Thermal Camera</h1>
+    <div class="sub">RS PRO / Seek Thermal Compact · USB 289D:0010 · 206×156</div>
+  </div>
+  <div class="spacer"></div>
+  <span id="status" class="pill">Not connected</span>
+  <span id="fps" class="pill">– fps</span>
+  <button id="connect" class="primary">Connect camera</button>
+  <button id="disconnect" disabled>Disconnect</button>
+</header>
+
+<div id="help" class="help" hidden>
+  <h3 id="helpTitle">One-time setup: give the browser access to the camera</h3>
+  <div id="helpAndroid" hidden>
+    <ol>
+      <li>Plug the camera into the phone's USB-C port. Use a USB-C OTG adapter if the camera's plug doesn't fit.</li>
+      <li>If Android asks which app should open the device, dismiss the prompt or choose Chrome.</li>
+      <li>Tap <b>Connect camera</b>, pick <b>PIR206 Thermal Camera</b> and allow access.</li>
+    </ol>
+    <p class="note">Use <b>Chrome</b> on Android. You don't need to install a driver. To add the app to your home screen, open Chrome's ⋮ menu and choose <b>Add to Home screen</b> (or <b>Install app</b>).</p>
+  </div>
+  <div id="helpBody">
+    Windows doesn't install a driver for this camera's USB interface, so the browser can't reach it until the generic WinUSB driver is bound to it:
+    <ol>
+      <li>Download <b>Zadig</b> from <code>zadig.akeo.ie</code> and run it (admin prompt).</li>
+      <li>Menu <b>Options → List All Devices</b>.</li>
+      <li>In the dropdown pick <b>iAP Interface</b> (USB ID <code>289D 0010 00</code>). Not <code>com.thermal.pir206.1</code>.</li>
+      <li>Target driver <b>WinUSB</b>, then click <b>Install Driver</b>.</li>
+      <li>Unplug and replug the camera, reload this page, and click <b>Connect camera</b>.</li>
+    </ol>
+    <p class="note">This only affects this camera. You can roll it back in Device Manager → Uninstall device (tick “delete driver”). Use <b>Chrome or Edge</b>: WebUSB isn't available in Firefox or Safari.</p>
+  </div>
+</div>
+
+<main>
+  <section>
+    <div class="viewer">
+      <div class="canvas-wrap">
+        <canvas id="view" width="828" height="616"></canvas>
+        <div id="placeholder" class="placeholder"><div id="placeholderText">Connect the camera to start the live feed.<br>Tip: add <code>?demo</code> to the URL to try the app with a simulated camera.</div></div>
+        <div id="flash" class="flash"></div>
+      </div>
+      <div class="colorbar">
+        <div class="lab" id="cbMax">–</div>
+        <canvas id="cb" width="18" height="256"></canvas>
+        <div class="lab" id="cbMin">–</div>
+      </div>
+    </div>
+    <div class="readouts">
+      <div class="ro"><div class="k">Centre</div><div class="v" id="roCentre">–</div></div>
+      <div class="ro max"><div class="k">Max</div><div class="v" id="roMax">–</div></div>
+      <div class="ro min"><div class="k">Min</div><div class="v" id="roMin">–</div></div>
+      <div class="ro"><div class="k" id="roSpotK">Spot</div><div class="v" id="roSpot">–</div></div>
+    </div>
+    <div class="toolbar">
+      <button id="capture" class="primary" disabled>📷 Take photo <kbd>Space</kbd></button>
+      <button id="freeze" disabled>Freeze <kbd>F</kbd></button>
+      <button id="pinClear" disabled>Clear pin</button>
+      <span class="note hover-hint">Hover to read a temperature and click to pin a spot.</span>
+    </div>
+  </section>
+
+  <aside>
+    <details class="card" open>
+      <summary>Display</summary>
+      <div class="row"><label for="palette">Palette</label>
+        <select id="palette">
+          <option value="iron">Ironbow</option>
+          <option value="rainbow">Rainbow</option>
+          <option value="lava">Lava</option>
+          <option value="white">White hot</option>
+          <option value="black">Black hot</option>
+        </select>
+      </div>
+      <div class="row"><label for="contrast">Contrast</label>
+        <select id="contrast">
+          <option value="linear">Linear</option>
+          <option value="equalize">Equalised (more detail)</option>
+        </select>
+      </div>
+      <div class="row"><label>Range</label>
+        <button id="rangeAuto" class="on">Auto</button>
+        <button id="rangeLock">Lock</button>
+      </div>
+      <div class="row"><label>Manual °C</label>
+        <span class="pair"><input id="rangeMin" type="number" step="0.5" title="Minimum °C"> – <input id="rangeMax" type="number" step="0.5" title="Maximum °C"></span>
+      </div>
+      <div class="row"><label for="denoise">Noise reduction</label>
+        <input id="denoise" type="range" min="0" max="0.9" step="0.05" value="0.5">
+      </div>
+      <div class="row"><label>Orientation</label>
+        <button id="rotate">Rotate ⟳</button>
+        <button id="mirror">Mirror ⇋</button>
+      </div>
+      <div class="row"><label for="smooth">Smooth pixels</label><input id="smooth" type="checkbox" checked></div>
+      <div class="row"><label for="markers">Min/max markers</label><input id="markers" type="checkbox" checked></div>
+    </details>
+
+    <details class="card" open>
+      <summary>Photos</summary>
+      <div class="row"><label for="saveCsv">Also save temperature CSV</label><input id="saveCsv" type="checkbox"></div>
+      <div class="row">
+        <button id="pickFolder">Auto-save to folder…</button>
+      </div>
+      <p class="note" id="folderNote">Photos are kept in the gallery below until you download them.</p>
+    </details>
+
+    <details class="card" open>
+      <summary>Temperature calibration</summary>
+      <div class="row"><label for="calSlope">°C per count</label><input id="calSlope" type="number" step="0.001"></div>
+      <div class="row"><label for="calIcpt">Shutter temp °C</label><input id="calIcpt" type="number" step="0.1"></div>
+      <div class="row"><label for="calRef">Reference °C</label><input id="calRef" type="number" step="0.1" placeholder="e.g. 0 or 100">
+        <button id="calAdd" disabled title="Uses the pinned spot, or the centre if nothing is pinned">Set point</button>
+      </div>
+      <div class="row"><button id="calReset">Reset</button><span class="note" id="calInfo"></span></div>
+      <p class="note">The Compact reports raw sensor counts, so temperatures are estimates until you calibrate. Aim at something of known temperature, such as ice water (0 °C) or a matte-taped surface measured with a probe. Pin it, enter its temperature and press <b>Set point</b>. One point corrects the offset. A second point at a different temperature corrects the scale too.</p>
+    </details>
+
+    <details class="card" open>
+      <summary>Image correction</summary>
+      <div class="row"><button id="ffcCapture" disabled>Capture flat-field</button><button id="ffcClear">Clear</button></div>
+      <p class="note" id="ffcInfo">Removes the fixed pattern and vignetting. Cover the lens with something of even temperature, such as a matte card or your palm, then click Capture.</p>
+    </details>
+
+    <details class="card" open>
+      <summary>Device</summary>
+      <div class="kv" id="devInfo"><span>Status</span><span>–</span></div>
+    </details>
+  </aside>
+</main>
+
+<div class="gallery-wrap">
+  <div class="gallery-head">
+    <h2>Photos</h2><span class="note" id="galleryCount"></span>
+    <div class="spacer"></div>
+    <button id="downloadAll" disabled>Download all</button>
+    <button id="clearAll" disabled>Clear</button>
+  </div>
+  <div id="gallery" class="gallery"><div class="empty">No photos yet.</div></div>
+</div>
+
+<dialog id="lightbox"><img id="lightboxImg" alt=""></dialog>
+
+<script>
+'use strict';
+
+/* ------------------------------------------------------------------ *
+ *  Seek Thermal Compact USB protocol (from OpenThermal/libseek-thermal)
+ * ------------------------------------------------------------------ */
+const VID = 0x289d, PID = 0x0010;
+const CMD = {
+  TOGGLE_SHUTTER: 55, READ_CHIP_ID: 54, SET_OPERATION_MODE: 60, GET_OPERATION_MODE: 61,
+  SET_IMAGE_PROCESSING_MODE: 62, GET_FIRMWARE_INFO: 78, START_GET_IMAGE_TRANSFER: 83,
+  TARGET_PLATFORM: 84, SET_FACTORY_SETTINGS_FEATURES: 86, GET_FACTORY_SETTINGS: 88,
+};
+const RAW_W = 208, RAW_H = 156, RAW_WORDS = RAW_W * RAW_H;   // 32448 words / frame
+const CHUNK = 16224;                                          // bytes per bulk read
+const SW = 207, SH = 154, ROI_Y = 1;                          // usable sensor area
+const OFFSET = 0x4000;                                        // flat-field baseline
+const FRAME_ID = { SHUTTER: 1, IMAGE: 3, FIRST: 4 };
+
+const hex = (u8) => Array.from(u8, b => b.toString(16).padStart(2, '0')).join(' ');
+
+class SeekCompact {
+  constructor(device) { this.dev = device; this.ep = 1; this.info = {}; }
+
+  async open() {
+    const d = this.dev;
+    await d.open();
+    if (!d.configuration || d.configuration.configurationValue !== 1) {
+      try { await d.selectConfiguration(1); } catch (e) { /* Windows: config is fixed */ }
+    }
+    await d.claimInterface(0);
+    const alt = d.configuration.interfaces.find(i => i.interfaceNumber === 0).alternate;
+    const ep = alt.endpoints.find(e => e.direction === 'in' && e.type === 'bulk');
+    if (ep) this.ep = ep.endpointNumber;
+  }
+
+  async set(cmd, bytes) {
+    const r = await this.dev.controlTransferOut(
+      { requestType: 'vendor', recipient: 'interface', request: cmd, value: 0, index: 0 },
+      new Uint8Array(bytes));
+    if (r.status !== 'ok' || r.bytesWritten !== bytes.length) throw new Error(`USB command ${cmd} failed (${r.status})`);
+  }
+
+  async get(cmd, len) {
+    const r = await this.dev.controlTransferIn(
+      { requestType: 'vendor', recipient: 'interface', request: cmd, value: 0, index: 0 }, len);
+    if (r.status !== 'ok' || !r.data || r.data.byteLength !== len) throw new Error(`USB query ${cmd} failed (${r.status})`);
+    return new Uint8Array(r.data.buffer, r.data.byteOffset, r.data.byteLength);
+  }
+
+  async init() {
+    try { await this.set(CMD.TARGET_PLATFORM, [0x01]); }
+    catch (e) { await this.stop(); await this.set(CMD.TARGET_PLATFORM, [0x01]); }  // camera wasn't closed cleanly
+    await this.set(CMD.SET_OPERATION_MODE, [0x00, 0x00]);
+    this.info.firmware = hex(await this.get(CMD.GET_FIRMWARE_INFO, 4));
+    this.info.chipId = hex(await this.get(CMD.READ_CHIP_ID, 12));
+    await this.set(CMD.SET_FACTORY_SETTINGS_FEATURES, [0x20, 0x00, 0x30, 0x00, 0x00, 0x00]);
+    await this.get(CMD.GET_FACTORY_SETTINGS, 64);
+    await this.set(CMD.SET_FACTORY_SETTINGS_FEATURES, [0x20, 0x00, 0x50, 0x00, 0x00, 0x00]);
+    await this.get(CMD.GET_FACTORY_SETTINGS, 64);
+    await this.set(CMD.SET_FACTORY_SETTINGS_FEATURES, [0x0c, 0x00, 0x70, 0x00, 0x00, 0x00]);
+    await this.get(CMD.GET_FACTORY_SETTINGS, 24);
+    await this.set(CMD.SET_FACTORY_SETTINGS_FEATURES, [0x06, 0x00, 0x08, 0x00, 0x00, 0x00]);
+    await this.get(CMD.GET_FACTORY_SETTINGS, 12);
+    await this.set(CMD.SET_IMAGE_PROCESSING_MODE, [0x08, 0x00]);
+    await this.get(CMD.GET_OPERATION_MODE, 2);
+    await this.set(CMD.SET_IMAGE_PROCESSING_MODE, [0x08, 0x00]);
+    await this.set(CMD.SET_OPERATION_MODE, [0x01, 0x00]);
+    await this.get(CMD.GET_OPERATION_MODE, 2);
+  }
+
+  async readFrame() {
+    await this.set(CMD.START_GET_IMAGE_TRANSFER, [RAW_WORDS & 0xff, (RAW_WORDS >> 8) & 0xff, 0, 0]);
+    const buf = new Uint8Array(RAW_WORDS * 2);
+    let done = 0, empty = 0;
+    while (done < buf.length) {
+      const r = await this.dev.transferIn(this.ep, CHUNK);
+      if (r.status === 'stall') { await this.dev.clearHalt('in', this.ep); continue; }
+      if (r.status !== 'ok') throw new Error(`Bulk read failed (${r.status})`);
+      const n = r.data.byteLength;
+      if (n === 0) { if (++empty > 8) throw new Error('Camera sent no data'); continue; }
+      buf.set(new Uint8Array(r.data.buffer, r.data.byteOffset, Math.min(n, buf.length - done)), done);
+      done += n;
+    }
+    return new Uint16Array(buf.buffer);   // little-endian, same as every browser platform
+  }
+
+  async stop() {
+    for (let i = 0; i < 3; i++) { try { await this.set(CMD.SET_OPERATION_MODE, [0x00, 0x00]); } catch (e) {} }
+  }
+
+  async close() {
+    try { await this.stop(); } catch (e) {}
+    try { await this.dev.releaseInterface(0); } catch (e) {}
+    try { await this.dev.close(); } catch (e) {}
+  }
+}
+
+/* Simulated camera for trying the UI without hardware (?demo). */
+class DemoCamera {
+  constructor() { this.n = 0; this.info = { firmware: 'demo', chipId: 'simulated' }; this.fpn = new Float32Array(RAW_WORDS).map(() => (Math.random() - .5) * 120); }
+  async open() {} async init() { this.n = 0; } async close() {}
+  async readFrame() {
+    await new Promise(r => setTimeout(r, 110));
+    const f = new Uint16Array(RAW_WORDS), t = this.n / 9, n = this.n++;
+    const id = n === 0 ? 4 : (n % 90 === 1 ? 1 : 3);
+    for (let y = 0; y < RAW_H; y++) for (let x = 0; x < RAW_W; x++) {
+      const i = y * RAW_W + x;
+      const dead = (x * 7 + y * 3) % 211 === 0;
+      if (id === 4) { f[i] = dead ? 0 : 6000 + (Math.random() + Math.random() + Math.random() - 1.5) * 12; continue; }
+      if (id === 1) { f[i] = 9000 + this.fpn[i]; continue; }
+      const bx = 104 + 60 * Math.cos(t * .6), by = 78 + 35 * Math.sin(t * .9);
+      const blob = 1300 * Math.exp(-((x - bx) ** 2 + (y - by) ** 2) / 260);
+      const cup = (x > 30 && x < 60 && y > 90 && y < 140) ? 800 : 0;
+      const cold = -250 * Math.exp(-((x - 170) ** 2 + (y - 40) ** 2) / 400);
+      f[i] = dead ? 0 : 9000 + this.fpn[i] + y * 1.5 + blob + cup + cold + (Math.random() - .5) * 40;
+    }
+    f[10] = id;
+    return f;
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ *  Image pipeline
+ * ------------------------------------------------------------------ */
+function roi(raw) {
+  const out = new Float32Array(SW * SH);
+  for (let y = 0; y < SH; y++) {
+    const src = (y + ROI_Y) * RAW_W;
+    for (let x = 0; x < SW; x++) out[y * SW + x] = raw[src + x];
+  }
+  return out;
+}
+
+// Same threshold logic as libseek: pixels far below the histogram peak of frame id 4 are dead.
+function buildDeadPixels(first) {
+  const hist = new Uint32Array(0x4000);
+  let max = 0;
+  for (const v of first) { if (v > max) max = v; if (v < 0x4000) hist[v | 0]++; }
+  hist[0] = 0;
+  let peak = 0;
+  for (let i = 1; i < hist.length; i++) if (hist[i] > hist[peak]) peak = i;
+  const thr = peak - (max - peak);
+  const good = new Uint8Array(SW * SH);
+  let deadCount = 0;
+  for (let i = 0; i < good.length; i++) { good[i] = first[i] > thr ? 1 : 0; if (!good[i]) deadCount++; }
+  if (deadCount > good.length * 0.1) { good.fill(1); deadCount = 0; }   // implausible, don't trust it
+  // Order the list so every dead pixel has at least one known neighbour when it is filled.
+  const known = good.slice(), list = [];
+  let progress = true;
+  while (list.length < deadCount && progress) {
+    progress = false;
+    for (let y = 0; y < SH; y++) for (let x = 0; x < SW; x++) {
+      const i = y * SW + x;
+      if (known[i]) continue;
+      if ((x > 0 && known[i - 1]) || (x < SW - 1 && known[i + 1]) || (y > 0 && known[i - SW]) || (y < SH - 1 && known[i + SW])) {
+        list.push(i); known[i] = 1; progress = true;
+      }
+    }
+  }
+  return { good, list };
+}
+
+function fillDead(img, dead) {
+  if (!dead || !dead.list.length) return;
+  const known = dead.good.slice();
+  for (const i of dead.list) {
+    const x = i % SW, y = (i / SW) | 0;
+    let s = 0, n = 0;
+    if (x > 0 && known[i - 1]) { s += img[i - 1]; n++; }
+    if (x < SW - 1 && known[i + 1]) { s += img[i + 1]; n++; }
+    if (y > 0 && known[i - SW]) { s += img[i - SW]; n++; }
+    if (y < SH - 1 && known[i + SW]) { s += img[i + SW]; n++; }
+    img[i] = n ? s / n : OFFSET;
+    known[i] = 1;
+  }
+}
+
+function orient(src, rot, mirror) {
+  const w = rot % 2 ? SH : SW, h = rot % 2 ? SW : SH;
+  const out = new Float32Array(w * h);
+  for (let y = 0; y < SH; y++) for (let x = 0; x < SW; x++) {
+    let X, Y;
+    switch (rot) {
+      case 1: X = SH - 1 - y; Y = x; break;
+      case 2: X = SW - 1 - x; Y = SH - 1 - y; break;
+      case 3: X = y; Y = SW - 1 - x; break;
+      default: X = x; Y = y;
+    }
+    if (mirror) X = w - 1 - X;
+    out[Y * w + X] = src[y * SW + x];
+  }
+  return { data: out, w, h };
+}
+
+/* ------------------------------------------------------------------ *
+ *  Palettes
+ * ------------------------------------------------------------------ */
+const PALETTE_STOPS = {
+  iron:    [[0, 0, 0, 12], [.18, 58, 8, 128], [.38, 160, 22, 136], [.58, 228, 76, 30], [.8, 255, 180, 0], [1, 255, 252, 220]],
+  rainbow: [[0, 10, 0, 120], [.18, 0, 90, 255], [.36, 0, 210, 210], [.54, 60, 220, 40], [.72, 255, 225, 0], [.88, 255, 100, 0], [1, 210, 0, 0]],
+  lava:    [[0, 0, 0, 0], [.3, 110, 0, 0], [.6, 230, 60, 0], [.85, 255, 190, 40], [1, 255, 255, 255]],
+  white:   [[0, 0, 0, 0], [1, 255, 255, 255]],
+  black:   [[0, 255, 255, 255], [1, 0, 0, 0]],
+};
+function buildLut(name) {
+  const stops = PALETTE_STOPS[name], lut = new Uint8Array(256 * 3);
+  for (let i = 0; i < 256; i++) {
+    const t = i / 255;
+    let k = 0; while (k < stops.length - 2 && t > stops[k + 1][0]) k++;
+    const a = stops[k], b = stops[k + 1], f = (t - a[0]) / (b[0] - a[0] || 1);
+    for (let c = 0; c < 3; c++) lut[i * 3 + c] = Math.round(a[c + 1] + (b[c + 1] - a[c + 1]) * Math.min(1, Math.max(0, f)));
+  }
+  return lut;
+}
+
+/* ------------------------------------------------------------------ *
+ *  State + persistence
+ * ------------------------------------------------------------------ */
+const store = {
+  get(k, d) { try { const v = localStorage.getItem('thermal.' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem('thermal.' + k, JSON.stringify(v)); } catch (e) {} },
+};
+const DEFAULT_CAL = { slope: 0.035, icpt: 25, points: [] };
+const S = {
+  cam: null, running: false, frozen: false,
+  ffc: null, dead: null, userFfc: null, ema: null,
+  frame: null,                    // { data (°C, oriented), w, h, raw (counts, oriented) }
+  lut: null, hover: null, pin: null,
+  rangeMode: 'auto', range: null,
+  rot: store.get('rot', 0), mirror: store.get('mirror', false),
+  cal: Object.assign({}, DEFAULT_CAL, store.get('cal', {})),
+  shots: [], dirHandle: null,
+  stats: { frames: 0, shutters: 0, t0: performance.now(), fpsFrames: 0 },
+};
+const toC = (counts) => S.cal.icpt + (counts - OFFSET) * S.cal.slope;
+const TOUCH = matchMedia('(pointer: coarse)').matches;
+const fmt = (c) => (c == null || !isFinite(c)) ? '–' : c.toFixed(1) + ' °C';
+
+/* ------------------------------------------------------------------ *
+ *  UI refs
+ * ------------------------------------------------------------------ */
+const $ = (id) => document.getElementById(id);
+const view = $('view'), vctx = view.getContext('2d');
+const off = document.createElement('canvas'), octx = off.getContext('2d');
+
+function setStatus(text, kind) { const s = $('status'); s.textContent = text; s.className = 'pill' + (kind ? ' ' + kind : ''); }
+function setDevInfo(pairs) { $('devInfo').innerHTML = pairs.map(([k, v]) => `<span>${k}</span><span>${v}</span>`).join(''); }
+const ANDROID = /Android/i.test(navigator.userAgent);
+const IS_PHONE = matchMedia('(max-width: 700px)').matches;
+function showHelp(title) {
+  $('help').hidden = false;
+  $('helpAndroid').hidden = !ANDROID;
+  $('helpBody').hidden = ANDROID;
+  if (title) $('helpTitle').textContent = title;
+  else if (ANDROID) $('helpTitle').textContent = 'Connect the camera to your phone';
+}
+
+function applyControls() {
+  S.lut = buildLut($('palette').value);
+  store.set('palette', $('palette').value);
+  store.set('contrast', $('contrast').value);
+  store.set('denoise', $('denoise').value);
+  store.set('smooth', $('smooth').checked);
+  store.set('markers', $('markers').checked);
+  store.set('saveCsv', $('saveCsv').checked);
+  drawColorbar();
+  if (S.frame) render();
+}
+
+/* ------------------------------------------------------------------ *
+ *  Acquisition
+ * ------------------------------------------------------------------ */
+const DEMO = new URLSearchParams(location.search).has('demo');
+const withTimeout = (p, ms) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('Camera stopped responding')), ms))]);
+
+async function connect() {
+  $('connect').disabled = true;
+  try {
+    let cam;
+    if (DEMO) cam = new DemoCamera();
+    else {
+      if (!navigator.usb) { showHelp('This browser has no WebUSB'); $('helpAndroid').hidden = true; $('helpBody').hidden = false; $('helpBody').innerHTML = ANDROID ? 'Open this page in <b>Chrome</b>. Other Android browsers may not support USB devices.' : 'Open this page in <b>Chrome</b> or <b>Edge</b>, or in Chrome on an Android phone. iPhone browsers have no USB access.'; throw new Error('WebUSB unavailable'); }
+      const known = (await navigator.usb.getDevices()).find(d => d.vendorId === VID && d.productId === PID);
+      const dev = known || await navigator.usb.requestDevice({ filters: [{ vendorId: VID, productId: PID }] });
+      cam = new SeekCompact(dev);
+      setStatus('Opening…', 'warn');
+      try { await cam.open(); }
+      catch (e) { showHelp(); throw new Error(ANDROID ? 'Could not open the camera: ' + e.message : 'Could not open the camera. Install the WinUSB driver first (see the setup steps above). ' + e.message); }
+    }
+    S.cam = cam;
+    await startCamera();
+  } catch (e) {
+    if (e.name === 'NotFoundError') { setStatus('No camera selected', 'warn'); showHelp('Camera not listed?'); }
+    else setStatus(e.message, 'err');
+    console.error(e);
+    $('connect').disabled = false;
+  }
+}
+
+async function startCamera() {
+  const cam = S.cam;
+  setStatus('Initialising…', 'warn');
+  S.ffc = null; S.ema = null;
+  let first = null;
+  for (let attempt = 0; attempt < 3 && !first; attempt++) {
+    await cam.init();
+    try {
+      const f = await withTimeout(cam.readFrame(), 4000);
+      if (f[10] === FRAME_ID.FIRST) first = f;
+    } catch (e) { console.warn('first frame', e); }
+  }
+  S.dead = first ? buildDeadPixels(roi(first)) : null;
+  S.running = true;
+  $('help').hidden = true;
+  $('placeholder').hidden = true;
+  ['disconnect', 'capture', 'freeze', 'ffcCapture', 'calAdd'].forEach(id => $(id).disabled = false);
+  setStatus(DEMO ? 'Demo camera' : 'Live', 'ok');
+  keepAwake(true);
+  updateDevInfo();
+  loop();
+}
+
+async function loop() {
+  let failures = 0;
+  while (S.running) {
+    let raw;
+    try { raw = await withTimeout(S.cam.readFrame(), 3000); failures = 0; }
+    catch (e) {
+      if (!S.running) break;
+      console.warn(e);
+      if (++failures > 3) { setStatus('Lost camera: ' + e.message, 'err'); await disconnect(); break; }
+      setStatus('Recovering…', 'warn');
+      try { await S.cam.init(); } catch (e2) {}
+      continue;
+    }
+    const id = raw[10];
+    if (id === FRAME_ID.SHUTTER) { S.ffc = roi(raw); S.stats.shutters++; continue; }
+    if (id === FRAME_ID.FIRST && !S.dead) { S.dead = buildDeadPixels(roi(raw)); continue; }
+    if (id !== FRAME_ID.IMAGE || !S.ffc) continue;
+    processFrame(raw);
+  }
+}
+
+function processFrame(raw) {
+  const img = roi(raw), ffc = S.ffc, uf = S.userFfc;
+  for (let i = 0; i < img.length; i++) img[i] = img[i] + OFFSET - ffc[i] - (uf ? uf[i] : 0);
+  fillDead(img, S.dead);
+  const a = 1 - parseFloat($('denoise').value);            // 1 = no smoothing
+  if (!S.ema || a >= 1) S.ema = img;
+  else for (let i = 0; i < img.length; i++) S.ema[i] += (img[i] - S.ema[i]) * a;
+  S.lastCounts = S.ema;
+  S.stats.frames++; S.stats.fpsFrames++;
+  const now = performance.now();
+  if (now - S.stats.t0 > 1000) {
+    $('fps').textContent = (S.stats.fpsFrames * 1000 / (now - S.stats.t0)).toFixed(1) + ' fps';
+    S.stats.t0 = now; S.stats.fpsFrames = 0; updateDevInfo();
+  }
+  if (S.frozen) return;
+  buildFrame();
+  render();
+}
+
+function buildFrame() {
+  const o = orient(S.lastCounts, S.rot, S.mirror);
+  const temps = new Float32Array(o.data.length);
+  for (let i = 0; i < temps.length; i++) temps[i] = toC(o.data[i]);
+  S.frame = { data: temps, raw: o.data, w: o.w, h: o.h, time: new Date() };
+}
+
+// Keep the phone screen on while streaming.
+let wakeLock = null;
+async function keepAwake(on) {
+  try {
+    if (on && !wakeLock && 'wakeLock' in navigator && document.visibilityState === 'visible') {
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', () => { wakeLock = null; });
+    } else if (!on && wakeLock) { await wakeLock.release(); wakeLock = null; }
+  } catch (e) { /* not supported or refused */ }
+}
+document.addEventListener('visibilitychange', () => { if (S.running && document.visibilityState === 'visible') keepAwake(true); });
+
+async function disconnect() {
+  S.running = false;
+  keepAwake(false);
+  if (S.cam) { const c = S.cam; S.cam = null; await c.close(); }
+  ['disconnect', 'capture', 'freeze', 'ffcCapture', 'calAdd'].forEach(id => $(id).disabled = true);
+  $('connect').disabled = false;
+  $('fps').textContent = '– fps';
+  if (!$('status').classList.contains('err')) setStatus('Disconnected');
+}
+
+function updateDevInfo() {
+  const c = S.cam;
+  setDevInfo([
+    ['Model', 'Seek Thermal Compact (PIR206)'],
+    ['Firmware', c ? c.info.firmware || '–' : '–'],
+    ['Chip ID', c ? c.info.chipId || '–' : '–'],
+    ['Frames', S.stats.frames],
+    ['Shutter cycles', S.stats.shutters],
+    ['Dead pixels fixed', S.dead ? S.dead.list.length : '–'],
+  ]);
+}
+
+/* ------------------------------------------------------------------ *
+ *  Rendering
+ * ------------------------------------------------------------------ */
+function stats(f) {
+  let mn = Infinity, mx = -Infinity, mnI = 0, mxI = 0;
+  for (let i = 0; i < f.data.length; i++) {
+    const v = f.data[i];
+    if (v < mn) { mn = v; mnI = i; }
+    if (v > mx) { mx = v; mxI = i; }
+  }
+  const sorted = Float32Array.from(f.data).sort();
+  const lo = sorted[Math.floor(sorted.length * 0.002)], hi = sorted[Math.ceil(sorted.length * 0.998) - 1];
+  return { mn, mx, mnI, mxI, lo, hi };
+}
+
+function colorize(f, lo, hi, target) {
+  const lut = S.lut, n = f.data.length, px = target.data;
+  const span = Math.max(hi - lo, 0.2);
+  let map;
+  if ($('contrast').value === 'equalize') {
+    const BINS = 1024, hist = new Uint32Array(BINS);
+    for (let i = 0; i < n; i++) hist[Math.min(BINS - 1, Math.max(0, ((f.data[i] - lo) / span * (BINS - 1)) | 0))]++;
+    const cdf = new Float32Array(BINS); let acc = 0;
+    for (let b = 0; b < BINS; b++) { acc += hist[b]; cdf[b] = acc / n; }
+    map = (v) => cdf[Math.min(BINS - 1, Math.max(0, ((v - lo) / span * (BINS - 1)) | 0))];
+  } else map = (v) => (v - lo) / span;
+  for (let i = 0; i < n; i++) {
+    const k = Math.min(255, Math.max(0, Math.round(map(f.data[i]) * 255))) * 3;
+    px[i * 4] = lut[k]; px[i * 4 + 1] = lut[k + 1]; px[i * 4 + 2] = lut[k + 2]; px[i * 4 + 3] = 255;
+  }
+}
+
+function currentRange(st) {
+  if (S.rangeMode === 'auto') S.range = { lo: st.lo, hi: st.hi };
+  return S.range;
+}
+
+function render() {
+  const f = S.frame; if (!f) return;
+  const st = stats(f);
+  const { lo, hi } = currentRange(st);
+  if (S.rangeMode === 'auto') { $('rangeMin').value = lo.toFixed(1); $('rangeMax').value = hi.toFixed(1); }
+  if (off.width !== f.w || off.height !== f.h) { off.width = f.w; off.height = f.h; }
+  const id = octx.createImageData(f.w, f.h);
+  colorize(f, lo, hi, id);
+  octx.putImageData(id, 0, 0);
+
+  // size the display canvas to its CSS box at device resolution
+  const cssW = view.clientWidth || 828, dpr = window.devicePixelRatio || 1;
+  const W = Math.round(cssW * dpr), H = Math.round(W * f.h / f.w);
+  if (view.width !== W || view.height !== H) { view.width = W; view.height = H; }
+  drawScene(vctx, W, H, f, st, 1.5 * dpr);
+
+  $('cbMax').textContent = hi.toFixed(1) + '°';
+  $('cbMin').textContent = lo.toFixed(1) + '°';
+  $('roMax').textContent = fmt(st.mx);
+  $('roMin').textContent = fmt(st.mn);
+  $('roCentre').textContent = fmt(f.data[((f.h / 2) | 0) * f.w + ((f.w / 2) | 0)]);
+  const spot = S.pin || S.hover;
+  $('roSpotK').textContent = S.pin ? 'Pinned spot' : (TOUCH ? 'Tap to pin' : 'Cursor');
+  $('roSpot').textContent = spot ? fmt(f.data[spot.y * f.w + spot.x]) : '–';
+}
+
+function drawScene(ctx, W, H, f, st, s) {
+  ctx.imageSmoothingEnabled = $('smooth').checked;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(off, 0, 0, W, H);
+  const sx = W / f.w, sy = H / f.h;
+  const at = (x, y) => [(x + .5) * sx, (y + .5) * sy];
+  ctx.font = `600 ${Math.round(12 * s)}px system-ui, sans-serif`;
+  ctx.textBaseline = 'middle';
+
+  const label = (x, y, text, color) => {
+    const pad = 4 * s, tw = ctx.measureText(text).width, th = 16 * s;
+    let lx = x + 10 * s, ly = y - th / 2;
+    if (lx + tw + pad * 2 > W) lx = x - 10 * s - tw - pad * 2;
+    ly = Math.min(Math.max(ly, 2), H - th - 2);
+    ctx.fillStyle = 'rgba(0,0,0,.65)';
+    ctx.fillRect(lx, ly, tw + pad * 2, th);
+    ctx.fillStyle = color;
+    ctx.fillText(text, lx + pad, ly + th / 2);
+  };
+  const cross = (x, y, color, size) => {
+    ctx.strokeStyle = 'rgba(0,0,0,.7)'; ctx.lineWidth = 3 * s;
+    ctx.beginPath(); ctx.moveTo(x - size, y); ctx.lineTo(x + size, y); ctx.moveTo(x, y - size); ctx.lineTo(x, y + size); ctx.stroke();
+    ctx.strokeStyle = color; ctx.lineWidth = 1.2 * s; ctx.stroke();
+  };
+  const tri = (x, y, color, up) => {
+    const r = 7 * s;
+    ctx.beginPath();
+    if (up) { ctx.moveTo(x, y - r); ctx.lineTo(x + r, y + r * .8); ctx.lineTo(x - r, y + r * .8); }
+    else { ctx.moveTo(x, y + r); ctx.lineTo(x + r, y - r * .8); ctx.lineTo(x - r, y - r * .8); }
+    ctx.closePath();
+    ctx.fillStyle = color; ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,.8)'; ctx.lineWidth = 1.2 * s; ctx.stroke();
+  };
+
+  const cx = (f.w / 2) | 0, cy = (f.h / 2) | 0, [px, py] = at(cx, cy);
+  cross(px, py, '#fff', 12 * s);
+  label(px, py, fmt(f.data[cy * f.w + cx]), '#fff');
+
+  if ($('markers').checked) {
+    const [mxx, mxy] = at(st.mxI % f.w, (st.mxI / f.w) | 0);
+    tri(mxx, mxy, '#ff5a3c', true); label(mxx, mxy, fmt(st.mx), '#ff9a80');
+    const [mnx, mny] = at(st.mnI % f.w, (st.mnI / f.w) | 0);
+    tri(mnx, mny, '#4da3ff', false); label(mnx, mny, fmt(st.mn), '#8cc4ff');
+  }
+  for (const [spot, color] of [[S.pin, '#7dff9a'], [S.pin ? null : S.hover, '#ffe36b']]) {
+    if (!spot) continue;
+    const [hx, hy] = at(spot.x, spot.y);
+    ctx.beginPath(); ctx.arc(hx, hy, 6 * s, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(0,0,0,.8)'; ctx.lineWidth = 3 * s; ctx.stroke();
+    ctx.strokeStyle = color; ctx.lineWidth = 1.5 * s; ctx.stroke();
+    label(hx, hy, fmt(f.data[spot.y * f.w + spot.x]), color);
+  }
+}
+
+function drawColorbar() {
+  const cb = $('cb'), c = cb.getContext('2d'), lut = S.lut;
+  const img = c.createImageData(cb.width, cb.height);
+  for (let y = 0; y < cb.height; y++) {
+    const k = (255 - Math.round(y / (cb.height - 1) * 255)) * 3;
+    for (let x = 0; x < cb.width; x++) {
+      const p = (y * cb.width + x) * 4;
+      img.data[p] = lut[k]; img.data[p + 1] = lut[k + 1]; img.data[p + 2] = lut[k + 2]; img.data[p + 3] = 255;
+    }
+  }
+  c.putImageData(img, 0, 0);
+}
+
+function pixelAt(ev) {
+  const f = S.frame; if (!f) return null;
+  const r = view.getBoundingClientRect();
+  const x = Math.floor((ev.clientX - r.left) / r.width * f.w), y = Math.floor((ev.clientY - r.top) / r.height * f.h);
+  return (x >= 0 && y >= 0 && x < f.w && y < f.h) ? { x, y } : null;
+}
+
+/* ------------------------------------------------------------------ *
+ *  Photos
+ * ------------------------------------------------------------------ */
+const stamp = (d) => d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0') + '_' +
+  String(d.getHours()).padStart(2, '0') + String(d.getMinutes()).padStart(2, '0') + String(d.getSeconds()).padStart(2, '0');
+
+async function capture() {
+  const f = S.frame; if (!f) return;
+  const st = stats(f), { lo, hi } = S.range;
+  const SCALE = 4, IW = f.w * SCALE, IH = f.h * SCALE, BAR = 90, FOOT = 64;
+  const c = document.createElement('canvas');
+  c.width = IW + BAR; c.height = IH + FOOT;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#0b0c0f'; ctx.fillRect(0, 0, c.width, c.height);
+  drawScene(ctx, IW, IH, f, st, 2);
+
+  // colour bar
+  const cbx = IW + 22, cby = 34, cbh = IH - 68;
+  for (let y = 0; y < cbh; y++) {
+    const k = (255 - Math.round(y / (cbh - 1) * 255)) * 3;
+    ctx.fillStyle = `rgb(${S.lut[k]},${S.lut[k + 1]},${S.lut[k + 2]})`;
+    ctx.fillRect(cbx, cby + y, 22, 1);
+  }
+  ctx.strokeStyle = '#444'; ctx.strokeRect(cbx - .5, cby - .5, 23, cbh + 1);
+  ctx.fillStyle = '#e6e8ec'; ctx.font = '600 15px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(hi.toFixed(1) + '°C', cbx + 11, cby - 16);
+  ctx.fillText(lo.toFixed(1) + '°C', cbx + 11, cby + cbh + 16);
+
+  // footer
+  ctx.textAlign = 'left'; ctx.font = '600 17px system-ui, sans-serif'; ctx.fillStyle = '#e6e8ec';
+  const centre = f.data[((f.h / 2) | 0) * f.w + ((f.w / 2) | 0)];
+  let line = `Centre ${fmt(centre)}   Max ${fmt(st.mx)}   Min ${fmt(st.mn)}`;
+  if (S.pin) line += `   Spot ${fmt(f.data[S.pin.y * f.w + S.pin.x])}`;
+  ctx.fillText(line, 14, IH + 24);
+  ctx.font = '13px system-ui, sans-serif'; ctx.fillStyle = '#9098a6';
+  ctx.fillText(`${f.time.toLocaleString()} · Seek Compact 206×156 · ${S.cal.points.length ? 'calibrated (' + S.cal.points.length + ' pt)' : 'uncalibrated estimate'}`, 14, IH + 48);
+
+  const blob = await new Promise(r => c.toBlob(r, 'image/png'));
+  const shot = { id: Date.now(), name: 'thermal_' + stamp(f.time), blob, url: URL.createObjectURL(blob), frame: { data: f.data.slice(), w: f.w, h: f.h }, st, time: f.time, centre };
+  S.shots.unshift(shot);
+  renderGallery();
+  $('flash').style.opacity = .6; setTimeout(() => $('flash').style.opacity = 0, 90);
+
+  if (S.dirHandle) {
+    try {
+      await writeFile(shot.name + '.png', blob);
+      if ($('saveCsv').checked) await writeFile(shot.name + '.csv', new Blob([toCsv(shot.frame)], { type: 'text/csv' }));
+      shot.saved = true; renderGallery();
+    } catch (e) { $('folderNote').textContent = 'Auto-save failed: ' + e.message; }
+  }
+}
+
+function toCsv(fr) {
+  const rows = [];
+  for (let y = 0; y < fr.h; y++) {
+    const r = new Array(fr.w);
+    for (let x = 0; x < fr.w; x++) r[x] = fr.data[y * fr.w + x].toFixed(2);
+    rows.push(r.join(','));
+  }
+  return rows.join('\r\n');
+}
+
+function download(blob, filename) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+
+async function writeFile(name, blob) {
+  const fh = await S.dirHandle.getFileHandle(name, { create: true });
+  const w = await fh.createWritable(); await w.write(blob); await w.close();
+}
+
+const CAN_SHARE = (() => {
+  try { return !!navigator.canShare && navigator.canShare({ files: [new File([new Blob()], 'x.png', { type: 'image/png' })] }); } catch (e) { return false; }
+})();
+async function sharePhoto(s) {
+  const files = [new File([s.blob], s.name + '.png', { type: 'image/png' })];
+  if ($('saveCsv').checked) files.push(new File([toCsv(s.frame)], s.name + '.csv', { type: 'text/csv' }));
+  const title = `Thermal photo ${s.time.toLocaleString()}`;
+  const text = `Max ${fmt(s.st.mx)} · Min ${fmt(s.st.mn)} · Centre ${fmt(s.centre)}`;
+  try { await navigator.share(navigator.canShare({ files }) ? { files, title, text } : { files: files.slice(0, 1), title, text }); }
+  catch (e) { if (e.name !== 'AbortError') download(s.blob, s.name + '.png'); }
+}
+
+function renderGallery() {
+  const g = $('gallery');
+  $('downloadAll').disabled = $('clearAll').disabled = !S.shots.length;
+  $('galleryCount').textContent = S.shots.length ? `${S.shots.length} photo${S.shots.length > 1 ? 's' : ''}` : '';
+  if (!S.shots.length) { g.innerHTML = '<div class="empty">No photos yet.</div>'; return; }
+  g.innerHTML = '';
+  for (const s of S.shots) {
+    const el = document.createElement('div'); el.className = 'shot';
+    el.innerHTML = `<img alt="Thermal photo" src="${s.url}">
+      <div class="meta"><b>${s.time.toLocaleTimeString()}</b> · max ${fmt(s.st.mx)} · min ${fmt(s.st.mn)}${s.saved ? ' · saved ✓' : ''}</div>
+      <div class="acts">${CAN_SHARE ? '<button data-a="share">Share</button>' : ''}<button data-a="png">PNG</button><button data-a="csv">CSV</button><div class="spacer"></div><button data-a="del" title="Remove">✕</button></div>`;
+    el.querySelector('img').onclick = () => { $('lightboxImg').src = s.url; $('lightbox').showModal(); };
+    el.querySelector('[data-a=png]').onclick = () => download(s.blob, s.name + '.png');
+    el.querySelector('[data-a=csv]').onclick = () => download(new Blob([toCsv(s.frame)], { type: 'text/csv' }), s.name + '.csv');
+    if (CAN_SHARE) el.querySelector('[data-a=share]').onclick = () => sharePhoto(s);
+    el.querySelector('[data-a=del]').onclick = () => { URL.revokeObjectURL(s.url); S.shots = S.shots.filter(x => x !== s); renderGallery(); };
+    g.appendChild(el);
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ *  Calibration + flat field
+ * ------------------------------------------------------------------ */
+function showCal() {
+  $('calSlope').value = S.cal.slope; $('calIcpt').value = S.cal.icpt;
+  $('calInfo').textContent = S.cal.points.length ? `${S.cal.points.length} reference point${S.cal.points.length > 1 ? 's' : ''} set` : 'Uncalibrated';
+  store.set('cal', S.cal);
+  if (S.lastCounts && !S.frozen) { buildFrame(); render(); }
+}
+
+function addCalPoint() {
+  const T = parseFloat($('calRef').value);
+  const f = S.frame;
+  if (!f || !isFinite(T)) { $('calInfo').textContent = 'Enter the reference temperature first'; return; }
+  const p = S.pin || { x: (f.w / 2) | 0, y: (f.h / 2) | 0 };
+  // average a 3×3 patch of counts to reduce noise
+  let s = 0, n = 0;
+  for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+    const x = p.x + dx, y = p.y + dy;
+    if (x >= 0 && y >= 0 && x < f.w && y < f.h) { s += f.raw[y * f.w + x]; n++; }
+  }
+  const counts = s / n;
+  const pts = S.cal.points.filter(q => Math.abs(q.T - T) > 2).slice(-1);   // keep one other distinct point
+  pts.push({ counts, T });
+  S.cal.points = pts;
+  if (pts.length === 2 && Math.abs(pts[1].counts - pts[0].counts) > 20) {
+    S.cal.slope = +((pts[1].T - pts[0].T) / (pts[1].counts - pts[0].counts)).toFixed(5);
+  }
+  S.cal.icpt = +(T - (counts - OFFSET) * S.cal.slope).toFixed(3);
+  $('calRef').value = '';
+  showCal();
+}
+
+function captureUserFfc() {
+  if (!S.lastCounts) return;
+  const src = S.lastCounts, base = S.userFfc;
+  const pattern = new Float32Array(src.length);
+  let mean = 0;
+  for (let i = 0; i < src.length; i++) { pattern[i] = src[i] + (base ? base[i] : 0); mean += pattern[i]; }
+  mean /= src.length;
+  for (let i = 0; i < src.length; i++) pattern[i] -= mean;
+  S.userFfc = pattern; S.ema = null;
+  try { localStorage.setItem('thermal.userFfc', btoa(String.fromCharCode(...new Uint8Array(Int16Array.from(pattern, v => Math.max(-32768, Math.min(32767, Math.round(v)))).buffer)))); } catch (e) {}
+  $('ffcInfo').textContent = 'Flat-field correction active. It is saved in this browser.';
+}
+function loadUserFfc() {
+  try {
+    const b = localStorage.getItem('thermal.userFfc'); if (!b) return;
+    const bytes = Uint8Array.from(atob(b), c => c.charCodeAt(0));
+    const arr = new Int16Array(bytes.buffer);
+    if (arr.length !== SW * SH) return;
+    S.userFfc = Float32Array.from(arr);
+    $('ffcInfo').textContent = 'Flat-field correction active. It is saved in this browser.';
+  } catch (e) {}
+}
+
+/* ------------------------------------------------------------------ *
+ *  Wiring
+ * ------------------------------------------------------------------ */
+$('palette').value = store.get('palette', 'iron');
+$('contrast').value = store.get('contrast', 'linear');
+$('denoise').value = store.get('denoise', '0.5');
+$('smooth').checked = store.get('smooth', true);
+$('markers').checked = store.get('markers', true);
+$('saveCsv').checked = store.get('saveCsv', false);
+['palette', 'contrast', 'denoise', 'smooth', 'markers', 'saveCsv'].forEach(id => $(id).addEventListener('change', applyControls));
+applyControls(); showCal(); loadUserFfc(); updateDevInfo();
+
+$('connect').onclick = connect;
+$('disconnect').onclick = () => { setStatus('Disconnected'); disconnect(); };
+$('capture').onclick = capture;
+$('freeze').onclick = () => { S.frozen = !S.frozen; $('freeze').classList.toggle('on', S.frozen); $('freeze').firstChild.textContent = S.frozen ? 'Resume ' : 'Freeze '; };
+$('pinClear').onclick = () => { S.pin = null; $('pinClear').disabled = true; render(); };
+
+const setRangeMode = (m) => {
+  S.rangeMode = m;
+  $('rangeAuto').classList.toggle('on', m === 'auto');
+  $('rangeLock').classList.toggle('on', m === 'manual');
+  render();
+};
+$('rangeAuto').onclick = () => setRangeMode('auto');
+$('rangeLock').onclick = () => { if (S.range) setRangeMode('manual'); };
+['rangeMin', 'rangeMax'].forEach(id => $(id).addEventListener('change', () => {
+  const lo = parseFloat($('rangeMin').value), hi = parseFloat($('rangeMax').value);
+  if (isFinite(lo) && isFinite(hi) && hi > lo) { S.range = { lo, hi }; setRangeMode('manual'); }
+}));
+
+const reorient = () => { store.set('rot', S.rot); store.set('mirror', S.mirror); S.pin = null; S.hover = null; if (S.lastCounts) { buildFrame(); render(); } };
+$('rotate').onclick = () => { S.rot = (S.rot + 1) % 4; reorient(); };
+$('mirror').onclick = () => { S.mirror = !S.mirror; $('mirror').classList.toggle('on', S.mirror); reorient(); };
+$('mirror').classList.toggle('on', S.mirror);
+
+view.addEventListener('mousemove', (e) => { S.hover = pixelAt(e); if (S.frozen) render(); });
+view.addEventListener('mouseleave', () => { S.hover = null; if (S.frozen) render(); });
+view.addEventListener('click', (e) => { const p = pixelAt(e); if (p) { S.pin = p; $('pinClear').disabled = false; render(); } });
+
+$('calSlope').onchange = () => { const v = parseFloat($('calSlope').value); if (v > 0) { S.cal.slope = v; showCal(); } };
+$('calIcpt').onchange = () => { const v = parseFloat($('calIcpt').value); if (isFinite(v)) { S.cal.icpt = v; showCal(); } };
+$('calAdd').onclick = addCalPoint;
+$('calReset').onclick = () => { S.cal = { ...DEFAULT_CAL, points: [] }; showCal(); };
+$('ffcCapture').onclick = captureUserFfc;
+$('ffcClear').onclick = () => { S.userFfc = null; S.ema = null; try { localStorage.removeItem('thermal.userFfc'); } catch (e) {} $('ffcInfo').textContent = 'Flat-field cleared.'; };
+
+$('pickFolder').onclick = async () => {
+  if (!window.showDirectoryPicker) { $('folderNote').textContent = 'Folder auto-save needs Chrome or Edge.'; return; }
+  try {
+    S.dirHandle = await window.showDirectoryPicker({ mode: 'readwrite', id: 'thermal-photos' });
+    $('folderNote').textContent = `Auto-saving to “${S.dirHandle.name}”.`;
+    $('pickFolder').classList.add('on');
+  } catch (e) { /* cancelled */ }
+};
+$('downloadAll').onclick = async () => {
+  for (const s of S.shots) {
+    download(s.blob, s.name + '.png');
+    if ($('saveCsv').checked) download(new Blob([toCsv(s.frame)], { type: 'text/csv' }), s.name + '.csv');
+    await new Promise(r => setTimeout(r, 250));
+  }
+};
+$('clearAll').onclick = () => { S.shots.forEach(s => URL.revokeObjectURL(s.url)); S.shots = []; renderGallery(); };
+$('lightbox').onclick = () => $('lightbox').close();
+
+document.addEventListener('keydown', (e) => {
+  if (e.target.matches('input, select, textarea')) return;
+  if (e.code === 'Space' && !$('capture').disabled) { e.preventDefault(); capture(); }
+  if (e.code === 'KeyF' && !$('freeze').disabled) $('freeze').click();
+});
+window.addEventListener('resize', () => render());
+window.addEventListener('pagehide', () => { if (S.cam) S.cam.close(); });
+if (navigator.usb) navigator.usb.addEventListener('disconnect', (e) => {
+  if (S.cam && S.cam.dev === e.device) { setStatus('Camera unplugged', 'err'); disconnect(); }
+});
+
+if (!window.showDirectoryPicker) { $('pickFolder').hidden = true; $('folderNote').textContent = CAN_SHARE ? 'Photos stay in the gallery below. Tap Share to send one, or PNG to save it.' : 'Photos stay in the gallery below until you download them.'; }
+if (IS_PHONE) document.querySelectorAll('aside details.card').forEach((d, i) => { if (i > 0) d.open = false; });
+if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => {});
+
+if (DEMO) { setStatus('Demo mode'); $('placeholderText').innerHTML = 'Demo mode: click <b>Connect camera</b> to start a simulated feed.'; }
+else if (!navigator.usb) showHelp('Open this page in Chrome or Edge');
+else navigator.usb.getDevices().then(ds => { if (!ds.some(d => d.vendorId === VID && d.productId === PID)) showHelp(); });
+</script>
+</body>
+</html>
